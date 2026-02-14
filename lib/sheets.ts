@@ -1,9 +1,27 @@
 import { google } from 'googleapis';
 
+// Parse private key - handle both escaped and actual newlines
+function parsePrivateKey(key: string | undefined): string | undefined {
+  if (!key) return undefined;
+
+  // Try to handle various formats
+  let parsedKey = key;
+
+  // If key contains literal \n, replace with actual newlines
+  if (parsedKey.includes('\\n')) {
+    parsedKey = parsedKey.replace(/\\n/g, '\n');
+  }
+
+  // Remove any extra quotes that might have been added
+  parsedKey = parsedKey.replace(/^["']|["']$/g, '');
+
+  return parsedKey;
+}
+
 const auth = new google.auth.GoogleAuth({
   credentials: {
     client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    private_key: parsePrivateKey(process.env.GOOGLE_PRIVATE_KEY),
   },
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
