@@ -1,11 +1,21 @@
 import { google } from 'googleapis';
 
-// Parse private key - handle both escaped and actual newlines
+// Parse private key - handle both escaped and actual newlines, plus base64
 function parsePrivateKey(key: string | undefined): string | undefined {
   if (!key) return undefined;
 
   // Try to handle various formats
   let parsedKey = key;
+
+  // Check if it's base64 encoded (for Vercel compatibility)
+  if (!parsedKey.includes('BEGIN PRIVATE KEY') && parsedKey.length > 100) {
+    try {
+      // Decode from base64
+      parsedKey = Buffer.from(parsedKey, 'base64').toString('utf-8');
+    } catch (e) {
+      console.error('Failed to decode base64 key:', e);
+    }
+  }
 
   // If key contains literal \n, replace with actual newlines
   if (parsedKey.includes('\\n')) {
