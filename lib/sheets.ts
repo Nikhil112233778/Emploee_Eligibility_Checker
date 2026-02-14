@@ -1,38 +1,52 @@
 import { google } from 'googleapis';
 
-// Parse private key - handle both escaped and actual newlines, plus base64
-function parsePrivateKey(key: string | undefined): string | undefined {
-  if (!key) return undefined;
+// Support both individual env vars and full JSON credentials
+let credentials;
 
-  // Try to handle various formats
-  let parsedKey = key;
+if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
+  // Use full JSON credentials (recommended for Vercel)
+  try {
+    const jsonString = Buffer.from(
+      process.env.GOOGLE_SERVICE_ACCOUNT_JSON,
+      'base64'
+    ).toString('utf-8');
+    credentials = JSON.parse(jsonString);
+  } catch (error) {
+    console.error('Failed to parse service account JSON:', error);
+    throw new Error('Invalid GOOGLE_SERVICE_ACCOUNT_JSON');
+  }
+} else {
+  // Fallback to individual environment variables
+  function parsePrivateKey(key: string | undefined): string | undefined {
+    if (!key) return undefined;
+    let parsedKey = key;
 
-  // Check if it's base64 encoded (for Vercel compatibility)
-  if (!parsedKey.includes('BEGIN PRIVATE KEY') && parsedKey.length > 100) {
-    try {
-      // Decode from base64
-      parsedKey = Buffer.from(parsedKey, 'base64').toString('utf-8');
-    } catch (e) {
-      console.error('Failed to decode base64 key:', e);
+    // Check if it's base64 encoded
+    if (!parsedKey.includes('BEGIN PRIVATE KEY') && parsedKey.length > 100) {
+      try {
+        parsedKey = Buffer.from(parsedKey, 'base64').toString('utf-8');
+      } catch (e) {
+        console.error('Failed to decode base64 key:', e);
+      }
     }
+
+    // Handle escaped newlines
+    if (parsedKey.includes('\\n')) {
+      parsedKey = parsedKey.replace(/\\n/g, '\n');
+    }
+
+    parsedKey = parsedKey.replace(/^["']|["']$/g, '');
+    return parsedKey;
   }
 
-  // If key contains literal \n, replace with actual newlines
-  if (parsedKey.includes('\\n')) {
-    parsedKey = parsedKey.replace(/\\n/g, '\n');
-  }
-
-  // Remove any extra quotes that might have been added
-  parsedKey = parsedKey.replace(/^["']|["']$/g, '');
-
-  return parsedKey;
+  credentials = {
+    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    private_key: parsePrivateKey(process.env.GOOGLE_PRIVATE_KEY),
+  };
 }
 
 const auth = new google.auth.GoogleAuth({
-  credentials: {
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    private_key: parsePrivateKey(process.env.GOOGLE_PRIVATE_KEY),
-  },
+  credentials,
   scopes: ['https://www.googleapis.com/auth/spreadsheets'],
 });
 
