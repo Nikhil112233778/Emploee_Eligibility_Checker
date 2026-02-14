@@ -11,11 +11,14 @@ const auth = new google.auth.GoogleAuth({
 const sheets = google.sheets({ version: 'v4', auth });
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 
+// Type for Google Sheets row data
+type SheetRow = (string | number | boolean)[];
+
 // Use globalThis to persist cache across Next.js hot reloads in dev mode
 declare global {
   var employeeCache: {
     dataMap: Map<string, { mobile: string | null }> | null;
-    dataRaw: any[][] | null;
+    dataRaw: SheetRow[] | null;
     timestamp: number;
     isPreloading: boolean;
   } | undefined;
@@ -35,7 +38,7 @@ const cache = globalThis.employeeCache;
 const CACHE_TTL = 600000; // 10 minutes (longer cache)
 
 // Helper function to build fast lookup map
-function buildEmployeeMap(rows: any[][]): Map<string, { mobile: string | null }> {
+function buildEmployeeMap(rows: SheetRow[]): Map<string, { mobile: string | null }> {
   const map = new Map<string, { mobile: string | null }>();
 
   for (const row of rows) {
@@ -62,7 +65,7 @@ async function preloadData(): Promise<void> {
       range: 'A:C',
     });
 
-    cache.dataRaw = response.data.values || [];
+    cache.dataRaw = (response.data.values as SheetRow[]) || [];
     cache.dataMap = buildEmployeeMap(cache.dataRaw);
     cache.timestamp = Date.now();
     const loadTime = Date.now() - startTime;
@@ -75,7 +78,7 @@ async function preloadData(): Promise<void> {
 }
 
 // Helper function to get cached or fresh data
-async function getSheetData(forceRefresh = false): Promise<any[][]> {
+async function getSheetData(forceRefresh = false): Promise<SheetRow[]> {
   const now = Date.now();
 
   // Return cached data if it's still valid and not forcing refresh
@@ -93,7 +96,7 @@ async function getSheetData(forceRefresh = false): Promise<any[][]> {
       range: 'A:C',
     });
 
-    cache.dataRaw = response.data.values || [];
+    cache.dataRaw = (response.data.values as SheetRow[]) || [];
     cache.dataMap = buildEmployeeMap(cache.dataRaw);
     cache.timestamp = now;
   }
