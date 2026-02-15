@@ -83,11 +83,18 @@ const CACHE_TTL = 600000; // 10 minutes (longer cache)
 function buildEmployeeMap(rows: SheetRow[]): Map<string, { mobile: string | null }> {
   const map = new Map<string, { mobile: string | null }>();
 
-  for (const row of rows) {
+  // Skip header row (index 0) and process data rows only
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
     if (row[0]) {
-      const employeeId = row[0].toString().trim();
+      // Normalize: trim whitespace and convert to uppercase for case-insensitive matching
+      const employeeId = row[0].toString().trim().toUpperCase();
       const mobile = row[1]?.toString().trim() || null;
-      map.set(employeeId, { mobile });
+
+      // Only add if employeeId is not empty after trimming
+      if (employeeId) {
+        map.set(employeeId, { mobile });
+      }
     }
   }
 
@@ -152,7 +159,8 @@ async function getEmployeeFromCache(employeeId: string): Promise<{ mobile: strin
     await preloadData();
   }
 
-  return cache.dataMap?.get(employeeId.trim()) || null;
+  // Normalize search input: trim and uppercase for case-insensitive matching
+  return cache.dataMap?.get(employeeId.trim().toUpperCase()) || null;
 }
 
 // Helper to invalidate cache
@@ -201,8 +209,11 @@ export async function updateMobileNumber(employeeId: string, mobile: string): Pr
       throw new Error('Employee not found');
     }
 
-    // Find the row index (1-based for Sheets API)
-    const rowIndex = rows.findIndex(row => row[0]?.toString().trim() === employeeId.trim());
+    // Find the row index (1-based for Sheets API) - case-insensitive
+    const normalizedSearchId = employeeId.trim().toUpperCase();
+    const rowIndex = rows.findIndex(row =>
+      row[0]?.toString().trim().toUpperCase() === normalizedSearchId
+    );
 
     if (rowIndex === -1) {
       throw new Error('Employee not found');
@@ -243,5 +254,97 @@ export async function addNewEmployee(employeeId: string, mobile: string, status:
   } catch (error) {
     console.error('Error adding new employee:', error);
     throw new Error('Failed to add new employee');
+  }
+}
+
+// ==================== ACTIVITY LOG FUNCTIONS ====================
+
+const ACTIVITY_LOG_SHEET_NAME = 'Activity Log';
+
+// Ensure Activity Log sheet exists with proper headers
+async function ensureActivityLogSheet(): Promise<void> {
+  try {
+    // Get all sheets in the spreadsheet
+    const spreadsheet = await sheets.spreadsheets.get({
+      spreadsheetId: SHEET_ID,
+    });
+
+    const sheetExists = spreadsheet.data.sheets?.some(
+      (sheet) => sheet.properties?.title === ACTIVITY_LOG_SHEET_NAME
+    );
+
+    if (!sheetExists) {
+      // Create the Activity Log sheet
+      console.log('Creating Activity Log sheet...');
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: SHEET_ID,
+        requestBody: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: ACTIVITY_LOG_SHEET_NAME,
+                },
+              },
+            },
+          ],
+        },
+      });
+
+      // Add headers to the new sheet
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: SHEET_ID,
+        range: `${ACTIVITY_LOG_SHEET_NAME}!A1:E1`,
+        valueInputOption: 'RAW',
+        requestBody: {
+          values: [['Timestamp', 'Employee ID', 'Eligible', 'Mobile Number', 'Action']],
+        },
+      });
+
+      console.log('Activity Log sheet created successfully');
+    }
+  } catch (error) {
+    console.error('Error ensuring Activity Log sheet exists:', error);
+    // Don't throw - we'll still try to log even if sheet check fails
+  }
+}
+
+// Log activity to Activity Log sheet
+export async function logActivity(
+  employeeId: string,
+  eligible: boolean,
+  mobile: string | null,
+  action: 'Checked' | 'Mobile Added' | 'Mobile Updated'
+): Promise<void> {
+  try {
+    // Ensure the sheet exists
+    await ensureActivityLogSheet();
+
+    // Format timestamp in readable format (ISO 8601)
+    const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    // Prepare row data
+    const rowData = [
+      timestamp,
+      employeeId,
+      eligible ? 'Yes' : 'No',
+      mobile || '-',
+      action,
+    ];
+
+    // Append to Activity Log sheet
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: SHEET_ID,
+      range: `${ACTIVITY_LOG_SHEET_NAME}!A:E`,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [rowData],
+      },
+    });
+
+    console.log(`Activity logged: ${employeeId} - ${action} - ${eligible ? 'Eligible' : 'Not Eligible'}`);
+  } catch (error) {
+    // Log error but don't throw - activity logging should not break main functionality
+    console.error('Error logging activity:', error);
   }
 }

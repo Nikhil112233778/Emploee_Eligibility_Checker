@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getEmployeeById, updateMobileNumber, addNewEmployee } from '@/lib/sheets';
+import { getEmployeeById, updateMobileNumber, logActivity } from '@/lib/sheets';
 
 export async function GET(request: Request) {
   try {
@@ -14,6 +14,10 @@ export async function GET(request: Request) {
     }
 
     const result = await getEmployeeById(id);
+
+    // Log the activity - every search is logged
+    await logActivity(id, result.eligible, result.mobile, 'Checked');
+
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error in GET /api/employee:', error);
@@ -46,11 +50,20 @@ export async function POST(request: Request) {
     }
 
     if (isNewEntry) {
-      // Create new row for non-eligible employee
-      await addNewEmployee(employeeId, mobile, 'Not Eligible');
+      // Non-eligible employee - don't add to main sheet, only log to Activity Log
+      // The Activity Log captures all the information we need for non-eligible employees
+      await logActivity(employeeId, false, mobile, 'Mobile Added');
     } else {
+      // For eligible employees, check if they had a mobile number before
+      const existingEmployee = await getEmployeeById(employeeId);
+      const hadMobile = existingEmployee.mobile !== null && existingEmployee.mobile !== '';
+
       // Update existing employee's mobile number
       await updateMobileNumber(employeeId, mobile);
+
+      // Log activity - Mobile Added (if no prior mobile) or Mobile Updated (if had mobile)
+      const action = hadMobile ? 'Mobile Updated' : 'Mobile Added';
+      await logActivity(employeeId, true, mobile, action);
     }
 
     return NextResponse.json({ success: true });

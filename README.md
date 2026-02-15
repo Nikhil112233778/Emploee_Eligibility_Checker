@@ -6,6 +6,7 @@ A modern, full-stack Next.js application that checks employee eligibility agains
 
 - **Real-time Eligibility Check**: Instantly verify employee eligibility status by Employee ID
 - **Mobile Number Management**: Add and edit mobile numbers for eligible employees
+- **Activity Log Tracking**: Automatic logging of all searches and mobile number updates to a separate "Activity Log" sheet for post-event analytics
 - **Google Sheets Backend**: Uses Google Sheets as a simple, accessible database
 - **Modern UI**: Beautiful, responsive design with smooth animations
 - **Type-safe**: Built with TypeScript for reliability and better developer experience
@@ -199,6 +200,60 @@ A modern, full-stack Next.js application that checks employee eligibility agains
 - Click "Save Mobile Number" to create a new record
 
 All changes are immediately saved to Google Sheets!
+
+## 📊 Activity Log & Analytics
+
+### Automatic Activity Tracking
+
+Every interaction is automatically logged to a separate "Activity Log" sheet in your Google Spreadsheet:
+
+**What Gets Logged:**
+- ✅ Every employee ID search (eligible or not eligible)
+- ✅ Every mobile number save (add or update)
+- ✅ Timestamp of each action
+- ✅ Action type (Checked, Mobile Added, Mobile Updated)
+
+**Activity Log Columns:**
+1. **Timestamp** - When the action occurred (e.g., `2026-02-15 14:30:25`)
+2. **Employee ID** - The employee ID that was searched
+3. **Eligible** - Yes or No
+4. **Mobile Number** - The mobile number (or `-` if none)
+5. **Action** - Type of action performed
+
+### Post-Event Analytics
+
+After an event, sales representatives can easily analyze:
+
+**Total Foot Traffic:**
+- Filter Activity Log by date to see all people who visited the booth
+
+**Eligible vs Non-Eligible Breakdown:**
+- Count "Eligible = Yes" vs "Eligible = No" to see conversion potential
+
+**Mobile Numbers Collected:**
+- Filter by "Mobile Added" or "Mobile Updated" actions
+
+**Time-Based Analysis:**
+- Filter by specific time ranges (e.g., 2-5 PM) to see peak hours
+
+**Repeat Visitors:**
+- Group by Employee ID to identify people who came back multiple times
+
+### Example Use Case
+
+**During Event:**
+- Sales rep searches 50 employee IDs throughout the day
+- Collects mobile numbers from 30 eligible employees
+- 20 non-eligible employees also inquired
+
+**After Event:**
+1. Open Google Sheet → "Activity Log" tab
+2. Filter by today's date
+3. See complete list of 50 unique interactions
+4. Export eligible leads (30) for follow-up
+5. Analyze peak hours for future event planning
+
+**Note:** The Activity Log sheet is automatically created on first use. No manual setup required!
 
 ## 🎨 Design Features
 
